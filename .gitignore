@@ -1,0 +1,19 @@
+# Python 虚拟环境（本地核验用，不入库）
+.venv/
+
+# 依赖
+node_modules/
+
+# 核验中间产物
+examples/verify/
+
+# 生成的 PDF / HTML（由源文件编译产出，不入库）
+examples/*.pdf
+examples/*.html
+
+# 打包产物
+*.vsix
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db

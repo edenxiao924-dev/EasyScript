@@ -1,0 +1,8 @@
+.venv/**
+node_modules/**
+tools/**
+examples/verify/**
+examples/*.pdf
+examples/*.html
+*.vsix
+.gitignore
