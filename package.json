@@ -1,0 +1,95 @@
+{
+  "name": "screenplay-lang",
+  "displayName": "Screenplay Language 剧本语言",
+  "description": "一种面向 AI 剧本创作的标记语言：.sp 源文件，VSCode 左侧写作、右侧实时预览，一键导出排版精确的 PDF（A4、中文剧本版式）。",
+  "version": "0.1.0",
+  "publisher": "eden-xiao",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "screenplay",
+    "剧本",
+    "编剧",
+    "pdf",
+    "chinese"
+  ],
+  "main": "./src/extension.js",
+  "activationEvents": [
+    "onLanguage:screenplay"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "screenplay",
+        "aliases": [
+          "Screenplay",
+          "screenplay",
+          "剧本"
+        ],
+        "extensions": [
+          ".sp",
+          ".screenplay"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "screenplay",
+        "scopeName": "source.screenplay",
+        "path": "./syntaxes/screenplay.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "screenplay.openPreview",
+        "title": "Screenplay: 打开实时预览（右侧）",
+        "category": "Screenplay"
+      },
+      {
+        "command": "screenplay.exportPdf",
+        "title": "Screenplay: 导出 PDF（同名）",
+        "category": "Screenplay"
+      },
+      {
+        "command": "screenplay.exportPdfAs",
+        "title": "Screenplay: 导出 PDF 为…",
+        "category": "Screenplay"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "screenplay.openPreview",
+        "key": "ctrl+k v",
+        "when": "editorLangId == screenplay"
+      },
+      {
+        "command": "screenplay.exportPdf",
+        "key": "ctrl+alt+p",
+        "when": "editorLangId == screenplay"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "screenplay.openPreview",
+          "when": "editorLangId == screenplay",
+          "group": "screenplay@1"
+        },
+        {
+          "command": "screenplay.exportPdf",
+          "when": "editorLangId == screenplay",
+          "group": "screenplay@2"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "node cli.js"
+  }
+}
