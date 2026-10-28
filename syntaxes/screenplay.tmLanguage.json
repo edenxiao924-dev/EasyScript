@@ -1,0 +1,106 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Screenplay",
+  "scopeName": "source.screenplay",
+  "patterns": [
+    { "include": "#frontmatter" },
+    { "include": "#comments" },
+    { "include": "#scene-heading" },
+    { "include": "#character-cue" },
+    { "include": "#transition" },
+    { "include": "#parenthetical" },
+    { "include": "#pagebreak" },
+    { "include": "#inline" }
+  ],
+  "repository": {
+    "frontmatter": {
+      "begin": "^(---)\\s*$",
+      "end": "^(---)\\s*$",
+      "contentName": "meta.frontmatter.screenplay",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.frontmatter.screenplay" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.frontmatter.screenplay" }
+      },
+      "patterns": [
+        {
+          "match": "^\\s*(title|author|contact|phone|email|date|draft)\\s*(:)\\s*(.*)$",
+          "captures": {
+            "1": { "name": "entity.name.tag.frontmatter.screenplay" },
+            "2": { "name": "punctuation.separator.key-value.screenplay" },
+            "3": { "name": "string.unquoted.frontmatter.screenplay" }
+          }
+        },
+        {
+          "match": "^\\s*([A-Za-z_][\\w-]*)\\s*(:)\\s*(.*)$",
+          "captures": {
+            "1": { "name": "variable.other.frontmatter.screenplay" },
+            "2": { "name": "punctuation.separator.key-value.screenplay" },
+            "3": { "name": "string.unquoted.frontmatter.screenplay" }
+          }
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.screenplay",
+          "begin": "/\\*",
+          "end": "\\*/"
+        },
+        {
+          "name": "comment.line.double-slash.screenplay",
+          "match": "(//).*$",
+          "captures": {
+            "1": { "name": "punctuation.definition.comment.screenplay" }
+          }
+        }
+      ]
+    },
+    "scene-heading": {
+      "patterns": [
+        {
+          "name": "entity.name.section.scene.screenplay",
+          "match": "^#\\s+.*$"
+        },
+        {
+          "name": "entity.name.section.scene.auto.screenplay",
+          "match": "^(?:INT|EXT|EST|INT\\.\\s*\\/\\s*EXT|EXT\\.\\s*\\/\\s*INT)(?:[.\\s-].*)?$"
+        }
+      ]
+    },
+    "character-cue": {
+      "name": "entity.name.type.character.screenplay",
+      "match": "^@.*$"
+    },
+    "transition": {
+      "name": "keyword.control.transition.screenplay",
+      "match": "^\\s*--.*$"
+    },
+    "parenthetical": {
+      "name": "string.quoted.other.parenthetical.screenplay",
+      "match": "^\\s*[（(].*[）)]\\s*$"
+    },
+    "pagebreak": {
+      "name": "punctuation.other.pagebreak.screenplay",
+      "match": "^={3,}\\s*$"
+    },
+    "inline": {
+      "patterns": [
+        {
+          "name": "markup.bold.screenplay",
+          "match": "\\*\\*[^*\\n]+\\*\\*"
+        },
+        {
+          "name": "markup.italic.screenplay",
+          "match": "\\*[^*\\n]+\\*"
+        },
+        {
+          "name": "markup.underline.screenplay",
+          "match": "__[^_\\n]+__"
+        }
+      ]
+    }
+  }
+}
