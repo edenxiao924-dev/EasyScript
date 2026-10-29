@@ -31,21 +31,38 @@ const REV_RED = '#C00000';
 /**
  * 加载预构建的「宋体斜体」WOFF2，以 base64 data URI 内联为 @font-face。
  * 这样 Webview 与 headless 打印 PDF 都能用到自带的斜体字形，无需联网。
+ *
+ * 为了让纯文本仓库（GitHub）也能完整承载该二进制字体，WOFF2 的 base64
+ * 被拆成若干纯文本块 assets/fonts/ob/ob_NN.txt（每块约 140KB）；
+ * 这里依次读取并拼接。若块不存在，则回退读取 WOFF2 二进制。
  */
 function loadObliqueFace() {
+  let b64 = '';
   try {
-    const woff2 = path.join(__dirname, '..', 'assets', 'fonts', 'SimSun-Oblique.woff2');
-    const b64 = fs.readFileSync(woff2).toString('base64');
-    return `@font-face {
+    const obDir = path.join(__dirname, '..', 'assets', 'fonts', 'ob');
+    for (let i = 0; i < 100; i++) {
+      const p = path.join(obDir, 'ob_' + String(i).padStart(2, '0') + '.txt');
+      if (!fs.existsSync(p)) break;
+      b64 += fs.readFileSync(p, 'utf8').trim();
+    }
+  } catch (e) {
+    b64 = '';
+  }
+  if (!b64) {
+    try {
+      const woff2 = path.join(__dirname, '..', 'assets', 'fonts', 'SimSun-Oblique.woff2');
+      b64 = fs.readFileSync(woff2).toString('base64');
+    } catch (e) {
+      return '';
+    }
+  }
+  return `@font-face {
   font-family: 'SimSun-Oblique';
   src: url(data:font/woff2;base64,${b64}) format('woff2');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }`;
-  } catch (e) {
-    return '';
-  }
 }
 const OBLIQUE_FACE = loadObliqueFace();
 
