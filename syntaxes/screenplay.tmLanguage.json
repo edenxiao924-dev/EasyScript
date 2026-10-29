@@ -5,7 +5,10 @@
   "patterns": [
     { "include": "#frontmatter" },
     { "include": "#comments" },
+    { "include": "#revise" },
+    { "include": "#montage" },
     { "include": "#scene-heading" },
+    { "include": "#sfx" },
     { "include": "#character-cue" },
     { "include": "#transition" },
     { "include": "#parenthetical" },
@@ -25,7 +28,7 @@
       },
       "patterns": [
         {
-          "match": "^\\s*(title|author|contact|phone|email|date|draft)\\s*(:)\\s*(.*)$",
+          "match": "^\\s*(title|author|contact|phone|email|date|draft|autonumber)\\s*(:)\\s*(.*)$",
           "captures": {
             "1": { "name": "entity.name.tag.frontmatter.screenplay" },
             "2": { "name": "punctuation.separator.key-value.screenplay" },
@@ -58,6 +61,38 @@
         }
       ]
     },
+    "revise": {
+      "begin": "(?i)^(revise)\\s*(\\{)",
+      "end": "\\}",
+      "contentName": "markup.changed.revision.screenplay",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.revise.screenplay" },
+        "2": { "name": "punctuation.curly.screenplay" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.curly.screenplay" }
+      },
+      "patterns": [
+        { "name": "string.other.revision.new.screenplay", "match": "\\[[^\\]]*\\]" }
+      ]
+    },
+    "montage": {
+      "begin": "(?i)^(montage)\\s*(\\{)",
+      "end": "\\}",
+      "contentName": "meta.montage.screenplay",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.montage.screenplay" },
+        "2": { "name": "punctuation.curly.screenplay" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.curly.screenplay" }
+      },
+      "patterns": [
+        { "include": "#character-cue" },
+        { "include": "#parenthetical" },
+        { "name": "markup.italic.montage-action.screenplay", "match": ".*" }
+      ]
+    },
     "scene-heading": {
       "patterns": [
         {
@@ -70,9 +105,32 @@
         }
       ]
     },
+    "sfx": {
+      "match": "(?i)^(SFX)(\\s*[:：]?\\s*)(.*)$",
+      "captures": {
+        "1": { "name": "keyword.control.sfx.screenplay" },
+        "2": { "name": "punctuation.separator.sfx.screenplay" },
+        "3": { "name": "markup.underline.screenplay" }
+      }
+    },
     "character-cue": {
-      "name": "entity.name.type.character.screenplay",
-      "match": "^@.*$"
+      "patterns": [
+        {
+          "match": "^(@)(.+?)(VO|OS|CO)$",
+          "captures": {
+            "1": { "name": "punctuation.definition.entity.screenplay" },
+            "2": { "name": "entity.name.type.character.screenplay" },
+            "3": { "name": "storage.modifier.screenplay" }
+          }
+        },
+        {
+          "match": "^(@)(.+)$",
+          "captures": {
+            "1": { "name": "punctuation.definition.entity.screenplay" },
+            "2": { "name": "entity.name.type.character.screenplay" }
+          }
+        }
+      ]
     },
     "transition": {
       "name": "keyword.control.transition.screenplay",
