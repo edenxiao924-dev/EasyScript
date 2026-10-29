@@ -4,5 +4,6 @@ tools/**
 examples/verify/**
 examples/*.pdf
 examples/*.html
+assets/fonts/*.ttf
 *.vsix
 .gitignore
