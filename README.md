@@ -32,7 +32,7 @@ contact: 18084992319
 
 （彭宇露出肉眼可见的失落表情）
 
---镜头缓慢向窗外移动，聚焦夜晚天空，然后往下抬升，转场到酒吧外围。
+--镜头缓慢向窗外移动，聚焦夜晚天空，然后又往下抬升，转场到酒吧外围。
 ```
 
 2. VSCode 中：
@@ -69,6 +69,18 @@ node cli.js 剧本.sp --html 预览.html # 只输出 HTML
 node cli.js 剧本.sp --check         # 只解析，输出 AST 与诊断
 ```
 
+## 构建（可选）
+
+蒙太奇画面描述需要「宋体斜体」字形。由于无头打印不会对中文合成斜体，该字体由脚本从系统宋体确定性生成，**作为构建产物不入库**（已发布的 VSIX 已内置）。从源码克隆后，如需在开发环境中使用，运行一次：
+
+```
+pip install fonttools brotli
+python tools/build_oblique_font.py
+# 生成 assets/fonts/SimSun-Oblique.woff2（与 .ttf）
+```
+
+未生成时，扩展仍可正常运行，仅蒙太奇画面描述回退为正体宋体。
+
 ## 排版规格
 
 * 页面 A4；上 / 下 2.54cm，左 / 右 3.81cm
@@ -99,7 +111,9 @@ screenplay-lang/
 │   ├── pdf.js                        # Edge/Chrome 无头打印
 │   └── extension.js                  # VSCode 扩展：实时预览 + 导出
 ├── cli.js                            # 命令行编译器
-├── examples/雨会停.sp
+├── examples/雨会停.sp  examples/v02演示.sp
+├── tools/build_oblique_font.py       # 构建宋体斜体（生成 assets/fonts/*.woff2）
+├── assets/fonts/                     # 字体构建产物（不入库，见“构建”）
 └── docs/语法手册.md
 ```
 
