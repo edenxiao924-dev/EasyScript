@@ -43,7 +43,7 @@ function loadObliqueFace() {
     for (let i = 0; i < 100; i++) {
       const p = path.join(obDir, 'ob_' + String(i).padStart(2, '0') + '.txt');
       if (!fs.existsSync(p)) break;
-      b64 += fs.readFileSync(p, 'utf8').trim();
+      b64 += fs.readFileSync(p, 'utf8').replace(/\s+/g, '');
     }
   } catch (e) {
     b64 = '';
@@ -310,10 +310,10 @@ p { margin: 0; }
   page-break-inside: avoid;
 }
 .body .revise .rev-meta {
-  color: ${REV_RED};
+  color: #A0A0A0;
   font-family: ${FONT_SONG};
-  font-size: 9pt;
-  text-align: left;
+  font-size: 8pt;
+  text-align: right;
   margin: 0 0 2pt;
 }
 .body .revise .rev-text {
