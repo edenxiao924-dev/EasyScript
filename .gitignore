@@ -14,12 +14,19 @@ examples/*.html
 # 打包产物
 *.vsix
 
-# 斜体字体的 TTF 构建中间产物（仅保留 woff2，可用 build_oblique_font.py 重建）
+# 斜体字体为构建产物（由 tools/build_oblique_font.py 从系统 SimSun 生成，不入库）
 assets/fonts/*.ttf
+assets/fonts/*.woff2
+assets/fonts/*.b64
+assets/fonts/ob/
+assets/fonts/_subset.ttf
+assets/fonts/_coverage.txt
 
 # GitHub 推送用的临时 payload 工具
 tools/make_payload.js
 tools/payload.json
+tools/bintest.txt
+tools/enc_probe.txt
 
 # 系统/编辑器
 .DS_Store
