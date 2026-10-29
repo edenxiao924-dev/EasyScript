@@ -1,28 +1,53 @@
 'use strict';
 /*
- * Screenplay Language (.sp) —— HTML 渲染器
+ * Screenplay Language (.sp) —— HTML 渲染器（v0.2）
  * 输出可直接用于：
  *   1) VSCode Webview 实时预览（@media screen 下渲染为 A4 白纸）；
  *   2) Edge/Chrome 无头打印 PDF（@media print + @page 精确控制版心）。
  *
- * 排版规格（与用户需求一一对应）：
- *   页面：A4；上/下边距 2.54cm；左/右边距 3.81cm
- *   标题页：标题 华文中宋/Courier New 28pt 倾斜 居中 单倍行距；
- *           作者、联系方式 宋体/Courier New 14pt 居中 单倍行距
- *   正文：
- *     场景标题 宋体/Courier New 11pt 两端对齐 无首行缩进；其前空两行
- *     动作段落 宋体/Courier New 10pt 两端对齐 无首行缩进
- *     角色名   黑体/Courier New 10pt 居中 无缩进
- *     对话内容 宋体/Courier New 10pt 左对齐 左缩进3cm 右缩进2.7cm
- *     括号     仿宋/Courier New 10pt 居中 无首行缩进
- *     转场     宋体/Courier New 10pt 两端对齐 首行缩进2字符，以 -- 开头
- *   块间距：动作/对话/括号/转场之间一律空一行；场景标题前空两行
+ * v0.2 排版增量：
+ *   角色后缀：VO 画外音（cue+对话灰色）、OS 画外声、CONT'D 接续
+ *   音效 SFX：下划线，左缩进0，右缩进2.79cm
+ *   修订 revise：新内容红色，上方小字注明 日期 #次数
+ *   蒙太奇 MONTAGE：标题 MONTAGE NN:，内部画面描述灰色斜体
+ *   动作段落中，有台词的角色名第一次出现时加粗
  */
+
+const fs = require('fs');
+const path = require('path');
 
 const FONT_SONG = '"Courier New", "SimSun", "宋体", serif';
 const FONT_HEI = '"Courier New", "SimHei", "黑体", sans-serif';
 const FONT_FANGSONG = '"Courier New", "FangSong", "仿宋", "仿宋_GB2312", serif';
 const FONT_ZHONGSONG = '"Courier New", "STZhongsong", "华文中宋", "SimSun", serif';
+// 蒙太奇画面描述：预构建的宋体斜体（字形已倾斜，规避 headless 打印不对 CJK 合成斜体的问题）
+const FONT_OBLIQUE = '"SimSun-Oblique", "Courier New", "SimSun", serif';
+
+// 灰色（画外音 / 蒙太奇画面描述）
+const GRAY = '#808080';
+// 修订红色
+const REV_RED = '#C00000';
+
+/**
+ * 加载预构建的「宋体斜体」WOFF2，以 base64 data URI 内联为 @font-face。
+ * 这样 Webview 与 headless 打印 PDF 都能用到自带的斜体字形，无需联网。
+ */
+function loadObliqueFace() {
+  try {
+    const woff2 = path.join(__dirname, '..', 'assets', 'fonts', 'SimSun-Oblique.woff2');
+    const b64 = fs.readFileSync(woff2).toString('base64');
+    return `@font-face {
+  font-family: 'SimSun-Oblique';
+  src: url(data:font/woff2;base64,${b64}) format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}`;
+  } catch (e) {
+    return '';
+  }
+}
+const OBLIQUE_FACE = loadObliqueFace();
 
 function escapeHtml(s) {
   return String(s)
@@ -65,8 +90,60 @@ function renderInline(text) {
   return out;
 }
 
+/** 角色名 + 后缀 -> 展示文本（统一使用全角括号，与参考图一致）。 */
+function cueDisplay(cue, modifier) {
+  if (!modifier) return cue;
+  if (modifier === 'VO') return `${cue}（V.O.）`;
+  if (modifier === 'OS') return `${cue}（O.S.）`;
+  if (modifier === 'CO') return `${cue}（CONT'D）`;
+  return cue;
+}
+
+/** 当前日期标签：YYYY.MM.DD */
+function todayLabel() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`;
+}
+
+/** 收集所有有台词的角色名（含蒙太奇内部）。 */
+function collectCueNames(blocks) {
+  const names = new Set();
+  for (const b of blocks) {
+    if (b.type === 'dialogue') names.add(b.cue);
+    if (b.type === 'montage') collectCueNames(b.blocks).forEach(n => names.add(n));
+  }
+  return names;
+}
+
+/**
+ * 渲染动作段落：把有台词的角色名在动作段落中第一次出现时加粗。
+ * 加粗状态在 ctx.bolded 中全局记录。
+ */
+function renderActionWithBold(text, ctx) {
+  let out = '';
+  let rest = text;
+  while (rest) {
+    let best = null;
+    for (const name of ctx.names) {
+      if (ctx.bolded.has(name)) continue;
+      const idx = rest.indexOf(name);
+      if (idx === -1) continue;
+      if (best === null || idx < best.idx || (idx === best.idx && name.length > best.name.length)) {
+        best = { idx, name };
+      }
+    }
+    if (!best) { out += renderInline(rest); break; }
+    out += renderInline(rest.slice(0, best.idx));
+    out += '<strong class="cb">' + renderInline(best.name) + '</strong>';
+    ctx.bolded.add(best.name);
+    rest = rest.slice(best.idx + best.name.length);
+  }
+  return out;
+}
+
 function buildCss() {
-  return `
+  return `${OBLIQUE_FACE}
 @page {
   size: A4;
   margin: 2.54cm 3.81cm;
@@ -178,6 +255,9 @@ p { margin: 0; }
   text-indent: 0;
   margin: 0 2.7cm 0 3cm;   /* 左缩进3cm，右缩进2.7cm（相对版心） */
 }
+/* 画外音 VO：角色名与对话整体灰色 */
+.body .dialogue.mod-vo .cue,
+.body .dialogue.mod-vo .line { color: ${GRAY}; }
 
 .body .paren {
   font-family: ${FONT_FANGSONG};
@@ -195,6 +275,67 @@ p { margin: 0; }
   text-align: justify;
   text-indent: 2em;        /* 首行缩进2字符 */
   margin: 0 0 13.1pt;
+}
+
+/* ===== 音效 SFX：下划线，左缩进0，右缩进2.79cm ===== */
+.body .sfx {
+  font-family: ${FONT_SONG};
+  font-size: 10pt;
+  text-align: left;
+  text-indent: 0;
+  margin: 0 2.79cm 13.1pt 0;
+}
+
+/* ===== 修订 revise ===== */
+.body .revise {
+  margin: 0 0 13.1pt;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.body .revise .rev-meta {
+  color: ${REV_RED};
+  font-family: ${FONT_SONG};
+  font-size: 9pt;
+  text-align: left;
+  margin: 0 0 2pt;
+}
+.body .revise .rev-text {
+  color: ${REV_RED};
+  font-family: ${FONT_SONG};
+  font-size: 10pt;
+  text-align: justify;
+  text-indent: 0;
+  margin: 0;
+}
+
+/* ===== 蒙太奇 MONTAGE ===== */
+.body .montage {
+  margin: 0 0 13.1pt;
+}
+.body .montage .m-head {
+  font-family: ${FONT_SONG};
+  font-size: 10pt;
+  font-weight: bold;
+  text-align: left;
+  margin: 0 0 13.1pt;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+/* 蒙太奇内部画面描述：灰色 + 斜体（字形已在 SimSun-Oblique 中倾斜） */
+.body .montage .m-action {
+  font-family: ${FONT_OBLIQUE};
+  font-size: 10pt;
+  font-style: normal;
+  color: ${GRAY};
+  text-align: left;
+  text-indent: 0;
+  margin: 0 0 13.1pt;
+}
+
+/* 动作段落中角色名首次出现加粗：SimSun 无粗体，用描边合成粗体（保留宋体字形） */
+.body .action strong.cb {
+  font-weight: bold;
+  -webkit-text-stroke: 0.5px currentColor;
 }
 
 .pagebreak { break-before: page; page-break-before: always; }
@@ -227,7 +368,8 @@ function buildTitlePage(meta) {
   return `<div class="sheet title-page">\n${lines.join('\n')}\n</div>`;
 }
 
-function buildBody(blocks) {
+/** 递归渲染块（顶层正文与 MONTAGE 内部复用）。 */
+function renderBlocks(blocks, ctx) {
   const out = [];
   for (const b of blocks) {
     switch (b.type) {
@@ -235,12 +377,17 @@ function buildBody(blocks) {
         out.push(`  <p class="scene">${renderInline(b.text)}</p>`);
         break;
       case 'action':
-        out.push(`  <p class="action">${renderInline(b.text)}</p>`);
+        if (ctx.inMontage) {
+          out.push(`  <p class="action m-action">${renderInline(b.text)}</p>`);
+        } else {
+          out.push(`  <p class="action">${renderActionWithBold(b.text, ctx)}</p>`);
+        }
         break;
       case 'dialogue': {
-        const lines = [`    <p class="cue">${renderInline(b.cue)}</p>`];
-        for (const l of b.lines) lines.push(`    <p class="line">${renderInline(l)}</p>`);
-        out.push(`  <div class="dialogue">\n${lines.join('\n')}\n  </div>`);
+        const cls = b.modifier ? `dialogue mod-${b.modifier.toLowerCase()}` : 'dialogue';
+        const head = [`    <p class="cue">${renderInline(cueDisplay(b.cue, b.modifier))}</p>`];
+        for (const l of b.lines) head.push(`    <p class="line">${renderInline(l)}</p>`);
+        out.push(`  <div class="${cls}">\n${head.join('\n')}\n  </div>`);
         break;
       }
       case 'paren':
@@ -249,6 +396,17 @@ function buildBody(blocks) {
       case 'transition':
         out.push(`  <p class="transition">${renderInline(b.text)}</p>`);
         break;
+      case 'sfx':
+        out.push(`  <p class="sfx"><u><strong>SFX: </strong>${renderInline(b.text)}</u></p>`);
+        break;
+      case 'revise':
+        out.push(`  <div class="revise">\n    <p class="rev-meta">${ctx.today} #${b.revNo}</p>\n    <p class="rev-text">${renderInline(b.text)}</p>\n  </div>`);
+        break;
+      case 'montage': {
+        const inner = renderBlocks(b.blocks, Object.assign({}, ctx, { inMontage: true }));
+        out.push(`  <div class="montage">\n    <p class="m-head">MONTAGE ${b.number}:</p>\n${inner}\n  </div>`);
+        break;
+      }
       case 'pagebreak':
         out.push(`  <div class="pagebreak"></div>`);
         break;
@@ -256,7 +414,11 @@ function buildBody(blocks) {
         break;
     }
   }
-  return `<div class="sheet body">\n${out.join('\n')}\n</div>`;
+  return out.join('\n');
+}
+
+function buildBody(blocks, ctx) {
+  return `<div class="sheet body">${renderBlocks(blocks, ctx)}</div>`;
 }
 
 function render(ast, options = {}) {
@@ -264,14 +426,23 @@ function render(ast, options = {}) {
   const hasTitle = ast.meta && (ast.meta.title || ast.meta.author || ast.meta.contact || ast.meta.email ||
     (ast.meta.extra && ast.meta.extra.length) || ast.meta.date || ast.meta.draft);
   if (hasTitle) sheets.push(buildTitlePage(ast.meta));
-  if (ast.blocks.length) sheets.push(buildBody(ast.blocks));
+
+  // 渲染上下文：角色名集合、加粗状态、日期
+  const ctx = {
+    inMontage: false,
+    today: todayLabel(),
+    names: [...collectCueNames(ast.blocks)].sort((a, b) => b.length - a.length),
+    bolded: new Set()
+  };
+
+  if (ast.blocks.length) sheets.push(buildBody(ast.blocks, ctx));
 
   const title = (ast.meta && ast.meta.title) ? ast.meta.title : '剧本预览';
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security" content="default-src 'none'; style-src 'unsafe-inline';">
+<meta http-equiv="Content-Security" content="default-src 'none'; style-src 'unsafe-inline'; font-src data:;">
 <title>${escapeHtml(title)}</title>
 <style>${buildCss()}</style>
 </head>
