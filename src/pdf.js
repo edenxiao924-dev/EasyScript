@@ -48,9 +48,20 @@ function findBrowser() {
   return null;
 }
 
+/**
+ * 构造子进程环境：剔除 Windows 应用兼容性垫片变量 __COMPAT_LAYER。
+ * 该变量（如取值 DetectorsAppHealth）会让被拉起的 Chromium/Edge 无头进程
+ * 立即退出、不执行打印，导致“输出文件不存在或过小”。
+ */
+function childEnv() {
+  const env = Object.assign({}, process.env);
+  delete env.__COMPAT_LAYER;
+  return env;
+}
+
 function runExecutable(file, args, timeoutMs) {
   return new Promise((resolve, reject) => {
-    execFile(file, args, { windowsHide: true, timeout: timeoutMs || 90000, maxBuffer: 8 * 1024 * 1024 },
+    execFile(file, args, { windowsHide: true, timeout: timeoutMs || 90000, maxBuffer: 8 * 1024 * 1024, env: childEnv() },
       (err, stdout, stderr) => {
         if (err) { err.stdout = stdout; err.stderr = stderr; reject(err); return; }
         resolve({ stdout, stderr });
