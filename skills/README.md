@@ -15,4 +15,6 @@ node scripts/render.js 剧本.sp --check        # 语法体检，退出码 2 表
 node scripts/render.js 剧本.sp -o 剧本.pdf     # 导出 PDF
 ```
 
+蒙太奇画面描述需要宋体斜体字形：仓库形态下运行 `python tools/build_oblique_font.py`，独立安装形态下运行 `scripts/build_oblique_font.py`（两者都需 `pip install fonttools brotli`）。不生成也能正常出 PDF，只是灰色斜体回退为正体宋体。
+
 要求：Node.js 18+；Windows + Edge/Chrome（PDF 打印与中文字体）。

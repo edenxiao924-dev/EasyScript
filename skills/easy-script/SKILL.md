@@ -9,7 +9,7 @@ description: 用 .sp 标记语言撰写中英文剧本，并一键编译为中�
 
 ## 工作流（按顺序执行，不要跳步）
 
-0. **一次性准备（仅当 `assets/oblique/` 为空时）**：MONTAGE 画面描述需要宋体斜体字形，无头打印不会自动合成中文斜体。缺字体时先运行 `python scripts/build_oblique_font.py`（需 `pip install fonttools brotli`，且机器上有宋体）。不运行也能出 PDF，只是蒙太奇画面描述变为正体宋体。
+0. **一次性准备（仅在需要灰色斜体画面描述时）**：MONTAGE 画面描述需要宋体斜体字形，无头打印不会自动合成中文斜体。独立安装时运行 `python scripts/build_oblique_font.py`（需 `pip install fonttools brotli`，机器上要有宋体），输出 `assets/oblique/SimSun-Oblique.woff2`；若本 Skill 放在仓库内，改运行仓库的 `python tools/build_oblique_font.py`（输出 `assets/fonts/`，供 `src/` 引擎加载）。不运行也能出 PDF，只是蒙太奇画面描述变为正体宋体。
 1. **落实要素**：标题、作者、联系方式（用户没给就留空或询问，不要编造电话/邮箱）。
 2. **写 `.sp` 文件**：UTF-8，扩展名 `.sp`。完整语法见 `references/syntax.md`；拿不准时先抄 `assets/template.sp`。
 3. **校验**：`node scripts/render.js <file.sp> --check`。退出码 2 表示有语法错误，必须修到退出码 0 再继续。
