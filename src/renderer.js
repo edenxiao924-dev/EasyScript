@@ -1,27 +1,26 @@
 'use strict';
 /*
- * Screenplay Language (.sp) —— HTML 渲染器（v0.2）
+ * Screenplay Language (.sp) —— HTML 渲染器（v1.0）
  * 输出可直接用于：
  *   1) VSCode Webview 实时预览（@media screen 下渲染为 A4 白纸）；
  *   2) Edge/Chrome 无头打印 PDF（@media print + @page 精确控制版心）。
  *
- * v0.2 排版增量：
- *   角色后缀：VO 画外音（cue+对话灰色）、OS 画外声、CONT'D 接续
- *   音效 SFX：下划线，左缩进0，右缩进2.79cm
- *   修订 revise：新内容红色，上方小字注明 日期 #次数
- *   蒙太奇 MONTAGE：标题 MONTAGE NN:，内部画面描述灰色斜体
- *   动作段落中，有台词的角色名第一次出现时加粗
+ * v1.0 排版增量：
+ *   AP/SP/SE/CE 四类带标识段落，排版与普通动作段落完全一致
+ *   台词中间的括号提示并入对话块显示（同独立括号样式）
+ *   字体栈增加 Noto CJK 回退，兼容 Linux / macOS
+ *   斜体字体目录兼容 <skill>/assets/oblique 与仓库根 assets/fonts/ob
  */
 
 const fs = require('fs');
 const path = require('path');
 
-const FONT_SONG = '"Courier New", "SimSun", "宋体", serif';
-const FONT_HEI = '"Courier New", "SimHei", "黑体", sans-serif';
-const FONT_FANGSONG = '"Courier New", "FangSong", "仿宋", "仿宋_GB2312", serif';
-const FONT_ZHONGSONG = '"Courier New", "STZhongsong", "华文中宋", "SimSun", serif';
+const FONT_SONG = '"Courier New", "SimSun", "宋体", "Noto Serif CJK SC", serif';
+const FONT_HEI = '"Courier New", "SimHei", "黑体", "Noto Sans CJK SC", sans-serif';
+const FONT_FANGSONG = '"Courier New", "FangSong", "仿宋", "仿宋_GB2312", "Noto Serif CJK SC", serif';
+const FONT_ZHONGSONG = '"Courier New", "STZhongsong", "华文中宋", "SimSun", "Noto Serif CJK SC", serif';
 // 蒙太奇画面描述：预构建的宋体斜体（字形已倾斜，规避 headless 打印不对 CJK 合成斜体的问题）
-const FONT_OBLIQUE = '"SimSun-Oblique", "Courier New", "SimSun", serif';
+const FONT_OBLIQUE = '"SimSun-Oblique", "Courier New", "SimSun", "Noto Serif CJK SC", serif';
 
 // 灰色（画外音 / 蒙太奇画面描述）
 const GRAY = '#808080';
@@ -32,29 +31,37 @@ const REV_RED = '#C00000';
  * 加载预构建的「宋体斜体」WOFF2，以 base64 data URI 内联为 @font-face。
  * 这样 Webview 与 headless 打印 PDF 都能用到自带的斜体字形，无需联网。
  *
- * 为了让纯文本仓库（GitHub）也能完整承载该二进制字体，WOFF2 的 base64
- * 被拆成若干纯文本块 assets/fonts/ob/ob_NN.txt（每块约 140KB）；
- * 这里依次读取并拼接。若块不存在，则回退读取 WOFF2 二进制。
+ * 为了让纯文本仓库（GitHub）也能承载该二进制字体，WOFF2 的 base64 被拆成若干
+ * 纯文本块 ob_NN.txt；这里依次读取并拼接。若块不存在，则回退读取同目录下的
+ * WOFF2 二进制（本地构建场景）。
  */
 function loadObliqueFace() {
+  // 两种仓库布局都兼容：<skill>/assets/oblique 与仓库根 assets/fonts/ob
+  const dirs = [
+    path.join(__dirname, '..', 'assets', 'oblique'),
+    path.join(__dirname, '..', 'assets', 'fonts', 'ob'),
+    path.join(__dirname, '..', '..', 'assets', 'fonts', 'ob')
+  ];
   let b64 = '';
-  try {
-    const obDir = path.join(__dirname, '..', 'assets', 'fonts', 'ob');
-    for (let i = 0; i < 100; i++) {
-      const p = path.join(obDir, 'ob_' + String(i).padStart(2, '0') + '.txt');
-      if (!fs.existsSync(p)) break;
-      b64 += fs.readFileSync(p, 'utf8').replace(/\s+/g, '');
-    }
-  } catch (e) {
-    b64 = '';
+  for (const obDir of dirs) {
+    try {
+      let acc = '';
+      for (let i = 0; i < 100; i++) {
+        const p = path.join(obDir, 'ob_' + String(i).padStart(2, '0') + '.txt');
+        if (!fs.existsSync(p)) break;
+        acc += fs.readFileSync(p, 'utf8').replace(/\s+/g, '');
+      }
+      if (acc) { b64 = acc; break; }
+    } catch (e) { /* 继续尝试下一个目录 */ }
   }
   if (!b64) {
-    try {
-      const woff2 = path.join(__dirname, '..', 'assets', 'fonts', 'SimSun-Oblique.woff2');
-      b64 = fs.readFileSync(woff2).toString('base64');
-    } catch (e) {
-      return '';
+    for (const dir of dirs) {
+      try {
+        const woff2 = path.join(dir, 'SimSun-Oblique.woff2');
+        if (fs.existsSync(woff2)) { b64 = fs.readFileSync(woff2).toString('base64'); break; }
+      } catch (e) { /* 继续 */ }
     }
+    if (!b64) return '';
   }
   return `@font-face {
   font-family: 'SimSun-Oblique';
@@ -244,7 +251,11 @@ p { margin: 0; }
 }
 .body .scene:first-child { margin-top: 0; }
 
-.body .action {
+/* 动作 / 场面 / 特效 / 摄影机角度与剪辑说明：排版完全一致 */
+.body .action,
+.body .sight,
+.body .effect,
+.body .camera {
   font-family: ${FONT_SONG};
   font-size: 10pt;
   text-align: justify;
@@ -275,6 +286,16 @@ p { margin: 0; }
 /* 画外音 VO：角色名与对话整体灰色 */
 .body .dialogue.mod-vo .cue,
 .body .dialogue.mod-vo .line { color: ${GRAY}; }
+
+/* 台词中间的表演提示：与独立括号同样式（仿宋居中） */
+.body .dialogue .line-paren {
+  font-family: ${FONT_FANGSONG};
+  font-size: 10pt;
+  text-align: center;
+  text-indent: 0;
+  margin: 0;
+}
+.body .dialogue.mod-vo .line-paren { color: ${GRAY}; }
 
 .body .paren {
   font-family: ${FONT_FANGSONG};
@@ -349,8 +370,11 @@ p { margin: 0; }
   margin: 0 0 13.1pt;
 }
 
-/* 动作段落中角色名首次出现加粗：SimSun 无粗体，用描边合成粗体（保留宋体字形） */
-.body .action strong.cb {
+/* 动作 / 场面 / 特效 / 摄影机段落中角色名首次出现加粗：SimSun 无粗体，用描边合成粗体（保留宋体字形） */
+.body .action strong.cb,
+.body .sight strong.cb,
+.body .effect strong.cb,
+.body .camera strong.cb {
   font-weight: bold;
   -webkit-text-stroke: 0.5px currentColor;
 }
@@ -394,16 +418,25 @@ function renderBlocks(blocks, ctx) {
         out.push(`  <p class="scene">${renderInline(b.text)}</p>`);
         break;
       case 'action':
-        if (ctx.inMontage) {
-          out.push(`  <p class="action m-action">${renderInline(b.text)}</p>`);
-        } else {
-          out.push(`  <p class="action">${renderActionWithBold(b.text, ctx)}</p>`);
-        }
+      case 'sight':
+      case 'effect':
+      case 'camera': {
+        const cls = ctx.inMontage ? `action m-action` : b.type;
+        const body = ctx.inMontage ? renderInline(b.text) : renderActionWithBold(b.text, ctx);
+        out.push(`  <p class="${cls}">${body}</p>`);
         break;
+      }
       case 'dialogue': {
         const cls = b.modifier ? `dialogue mod-${b.modifier.toLowerCase()}` : 'dialogue';
         const head = [`    <p class="cue">${renderInline(cueDisplay(b.cue, b.modifier))}</p>`];
-        for (const l of b.lines) head.push(`    <p class="line">${renderInline(l)}</p>`);
+        for (const l of b.lines) {
+          // 台词中间的表演提示（整行括号）留在对话块内，样式与独立括号一致
+          if (l && typeof l === 'object' && l.paren) {
+            head.push(`    <p class="line-paren">${renderInline(l.paren)}</p>`);
+          } else {
+            head.push(`    <p class="line">${renderInline(l)}</p>`);
+          }
+        }
         out.push(`  <div class="${cls}">\n${head.join('\n')}\n  </div>`);
         break;
       }
