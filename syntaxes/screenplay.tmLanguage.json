@@ -7,6 +7,7 @@
     { "include": "#comments" },
     { "include": "#revise" },
     { "include": "#montage" },
+    { "include": "#para-tag" },
     { "include": "#scene-heading" },
     { "include": "#sfx" },
     { "include": "#character-cue" },
@@ -62,27 +63,29 @@
       ]
     },
     "revise": {
-      "begin": "(?i)^(revise)\\s*(\\{)",
+      "begin": "(?i)^(revise)\\b",
       "end": "\\}",
       "contentName": "markup.changed.revision.screenplay",
       "beginCaptures": {
-        "1": { "name": "keyword.control.revise.screenplay" },
-        "2": { "name": "punctuation.curly.screenplay" }
+        "1": { "name": "keyword.control.revise.screenplay" }
       },
       "endCaptures": {
         "0": { "name": "punctuation.curly.screenplay" }
       },
       "patterns": [
-        { "name": "string.other.revision.new.screenplay", "match": "\\[[^\\]]*\\]" }
+        {
+          "begin": "\\[",
+          "end": "\\]",
+          "name": "string.other.revision.new.screenplay"
+        }
       ]
     },
     "montage": {
-      "begin": "(?i)^(montage)\\s*(\\{)",
+      "begin": "(?i)^(montage)\\b",
       "end": "\\}",
       "contentName": "meta.montage.screenplay",
       "beginCaptures": {
-        "1": { "name": "keyword.control.montage.screenplay" },
-        "2": { "name": "punctuation.curly.screenplay" }
+        "1": { "name": "keyword.control.montage.screenplay" }
       },
       "endCaptures": {
         "0": { "name": "punctuation.curly.screenplay" }
@@ -91,6 +94,20 @@
         { "include": "#character-cue" },
         { "include": "#parenthetical" },
         { "name": "markup.italic.montage-action.screenplay", "match": ".*" }
+      ]
+    },
+    "para-tag": {
+      "begin": "(?i)^(AP|SP|SE|CE)(?:\\s*(\\{))?",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": { "name": "keyword.control.para.screenplay" },
+        "2": { "name": "punctuation.curly.screenplay" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.curly.screenplay" }
+      },
+      "patterns": [
+        { "include": "#inline" }
       ]
     },
     "scene-heading": {

@@ -1,8 +1,8 @@
 {
   "name": "screenplay-lang",
   "displayName": "Screenplay Language 剧本语言",
-  "description": "一种面向 AI 剧本创作的标记语言：.sp 源文件，VSCode 左侧写作、右侧实时预览，一键导出排版精确的 PDF（A4、中文剧本版式）。",
-  "version": "0.2.2",
+  "description": "一种面向 AI 剧本创作的标记语言（v1.0）：.sp 源文件，AP/SP/SE/CE 四类带标识段落，VSCode 左侧写作、右侧实时预览，一键导出排版精确的 PDF（A4、中文剧本版式）。也是 easy-script Skill 的编译引擎。",
+  "version": "1.0.0",
   "publisher": "eden-xiao",
   "engines": {
     "vscode": "^1.75.0"
@@ -16,7 +16,8 @@
     "剧本",
     "编剧",
     "pdf",
-    "chinese"
+    "chinese",
+    "ai-skill"
   ],
   "main": "./src/extension.js",
   "repository": {
