@@ -1,6 +1,6 @@
 'use strict';
 /*
- * HTML -> PDF：调用本机 Edge / Chrome 的无头打印能力，无需安装任何第三方依赖。
+ * HTML -> PDF：调用本机 Edge / Chrome / Chromium 的无头打印能力，无需安装任何第三方依赖。
  * Chromium 的 print-to-pdf 完整支持 @page、中文字体、pt/cm 单位。
  */
 const fs = require('fs');
@@ -32,20 +32,47 @@ function browserCandidates() {
   } else {
     list.push(
       '/usr/bin/microsoft-edge',
+      '/usr/bin/microsoft-edge-stable',
       '/usr/bin/google-chrome',
       '/usr/bin/google-chrome-stable',
       '/usr/bin/chromium',
-      '/usr/bin/chromium-browser'
+      '/usr/bin/chromium-browser',
+      // Linux 常见安装位置（发行版 / snap / 容器镜像各不相同）
+      '/usr/local/bin/microsoft-edge',
+      '/usr/local/bin/google-chrome',
+      '/usr/local/bin/google-chrome-stable',
+      '/usr/local/bin/chromium',
+      '/usr/local/bin/chromium-browser',
+      '/snap/bin/chromium',
+      '/opt/google/chrome/chrome'
     );
   }
   return list;
+}
+
+/** 在 PATH 中查找浏览器可执行文件（兼容 apt / snap / 容器内自定义安装）。 */
+const BROWSER_NAMES = [
+  'msedge', 'microsoft-edge', 'microsoft-edge-stable',
+  'google-chrome', 'google-chrome-stable', 'chrome',
+  'chromium', 'chromium-browser', 'headless_shell'
+];
+
+function findByPathName() {
+  const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
+  for (const name of BROWSER_NAMES) {
+    for (const dir of dirs) {
+      const p = path.join(dir, name);
+      try { if (fs.existsSync(p)) return p; } catch (_) { /* ignore */ }
+    }
+  }
+  return null;
 }
 
 function findBrowser() {
   for (const p of browserCandidates()) {
     try { if (p && fs.existsSync(p)) return p; } catch (_) { /* ignore */ }
   }
-  return null;
+  return findByPathName();
 }
 
 /**
@@ -69,7 +96,7 @@ function runExecutable(file, args, timeoutMs) {
   });
 }
 
-// 诊断日志（便于排查扩展宿主内的无头打印问题）
+// 诊断日志（便于排查扩展赅主内的无头打印问题）
 function diagLog(msg) {
   try {
     const line = `[${new Date().toISOString()}] ${msg}\n`;
@@ -85,7 +112,7 @@ function diagLog(msg) {
 async function htmlToPdf(html, pdfPath, opts = {}) {
   const browser = opts.browserPath || findBrowser();
   if (!browser) {
-    throw new Error('未找到 Microsoft Edge 或 Google Chrome，请安装其一，或用 --browser 指定可执行文件路径。');
+    throw new Error('未找到 Microsoft Edge / Google Chrome / Chromium，请安装其一，或用 --browser 指定可执行文件路径。');
   }
 
   diagLog(`node=${process.version} cwd=${process.cwd()} browser=${browser}`);
@@ -112,6 +139,10 @@ async function htmlToPdf(html, pdfPath, opts = {}) {
     `--print-to-pdf=${tmpPdf}`,
     pathToFileURL(htmlPath).href
   ];
+  // Linux / 容器内以 root 运行时 Chromium 需要关闭沙箱，否则静默退出
+  if (process.platform !== 'win32' && process.platform !== 'darwin') {
+    common.unshift('--no-sandbox', '--disable-dev-shm-usage');
+  }
 
   // 优先新版 headless，失败则回退旧版
   let lastErr = null;
