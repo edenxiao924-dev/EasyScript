@@ -1,12 +1,15 @@
 'use strict';
 /*
- * Screenplay Language (.sp) —— 解析器（v0.2）
+ * Screenplay Language (.sp) —— 解析器（v1.0）
  * 将剧本文本解析为 AST：
  *   {
  *     meta: { title, author, contact, email, date, draft, autonumber, extra: [...] },
  *     blocks: [
  *       { type: 'scene',      text },
- *       { type: 'action',     text },
+ *       { type: 'action',     text },      // 默认段落 / AP
+ *       { type: 'sight',      text },      // SP 场面段落
+ *       { type: 'effect',     text },      // SE 特效段落
+ *       { type: 'camera',     text },      // CE 摄影机角度与剪辑说明
  *       { type: 'dialogue',   cue, modifier: 'VO'|'OS'|'CO'|null, lines: [] },
  *       { type: 'paren',      text },
  *       { type: 'transition', text },
@@ -29,9 +32,15 @@ const PAREN_RE = /^\s*[（(][\s\S]*[）)]\s*$/;
 const TRANSITION_RE = /^\s*--/;
 // 音效：SFX 后接内容
 const SFX_RE = /^SFX\s*[:：]?\s*(.+)$/i;
-// 修订 / 蒙太奇块开启
-const REVISE_OPEN_RE = /^revise\s*\{/i;
-const MONTAGE_OPEN_RE = /^montage\s*\{/i;
+// 修订 / 蒙太奇块关键字（大括号可同行，也可换行到下一行）
+const REVISE_KW_RE = /^revise\b/im;
+const MONTAGE_KW_RE = /^montage\b/im;
+// 带标识的段落：AP 动作 / SP 场面 / SE 特效 / CE 摄影机角度与剪辑说明
+// 大括号同样允许同行或换行到下一行
+const PARA_TAG_RE = /^(AP|SP|SE|CE)\s*$/i;          // 标识独占一行
+const PARA_TAG_OPEN_RE = /^(AP|SP|SE|CE)\s*\{/i;    // 标识与大括号同行
+const PARA_TYPE = { AP: 'action', SP: 'sight', SE: 'effect', CE: 'camera' };
+const PARA_TYPES = new Set(['action', 'sight', 'effect', 'camera']);
 // 角色名后缀（画外音 / 画外声 / 接续）
 const CUE_SUFFIX_RE = /^(.*?)(VO|OS|CO)$/i;
 
@@ -174,13 +183,34 @@ function consumeBraced(lines, startIdx) {
   return { innerLines, endIdx: lines.length, ok: false };
 }
 
-/** 构建修订节点：提取 [新内容]，无方括号时整段视为新内容。 */
-function buildRevise(innerLines) {
-  const text = innerLines
+/**
+ * 定位块起始的 "{"：
+ *   - 关键字所在行已出现 "{"（revise{ / MONTAGE{ / AP{）→ 用本行；
+ *   - 否则向下跳过空行与纯 // 注释行，第一个有效行以 "{" 开头即视为块开启。
+ * 返回含 "{" 的行下标，找不到返回 -1。
+ */
+function findBraceStart(lines, startIdx) {
+  if (lines[startIdx].indexOf('{') !== -1) return startIdx;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    const t = lines[i].replace(/\/\/.*$/g, '').trim();
+    if (t === '') continue;
+    return t.startsWith('{') ? i : -1;
+  }
+  return -1;
+}
+
+/** 把块内的多行合并成一个段落（与动作段落同样的换行合并规则）。 */
+function joinParagraph(innerLines) {
+  return innerLines
     .map(l => l.trim())
     .filter(Boolean)
     .reduce((acc, t) => (acc ? joinLines(acc, t) : t), '');
-  const bm = text.match(/\[([\s\S]*?)\]/);
+}
+
+/** 构建修订节点：提取 [新内容]（可跨行），无方括号时整段视为新内容。 */
+function buildRevise(innerLines) {
+  const text = joinParagraph(innerLines);
+  const bm = text.match(/\[\s*([\s\S]*?)\s*\]/);
   return { type: 'revise', text: (bm ? bm[1].trim() : text), revNo: 0 };
 }
 
@@ -281,24 +311,51 @@ function parseBodyLines(lines) {
       continue;
     }
 
-    // 修订块
-    if (REVISE_OPEN_RE.test(trimmed)) {
-      flush();
-      const { innerLines, endIdx, ok } = consumeBraced(lines, i);
-      if (!ok) errors.push({ line: lineNo, message: 'revise 块缺少结束标记 }' });
-      blocks.push(buildRevise(innerLines));
-      i = endIdx - 1;
-      continue;
+    // 修订块：revise{...} / revise 换行 {...}
+    if (REVISE_KW_RE.test(trimmed)) {
+      const braceIdx = findBraceStart(lines, i);
+      if (braceIdx !== -1) {
+        flush();
+        const { innerLines, endIdx, ok } = consumeBraced(lines, braceIdx);
+        if (!ok) errors.push({ line: lineNo, message: 'revise 块缺少结束标记 }' });
+        blocks.push(buildRevise(innerLines));
+        i = endIdx - 1;
+        continue;
+      }
     }
 
-    // 蒙太奇块
-    if (MONTAGE_OPEN_RE.test(trimmed)) {
-      flush();
-      const { innerLines, endIdx, ok } = consumeBraced(lines, i);
-      if (!ok) errors.push({ line: lineNo, message: 'MONTAGE 块缺少结束标记 }' });
-      blocks.push(buildMontage(innerLines));
-      i = endIdx - 1;
-      continue;
+    // 蒙太奇块：MONTAGE{...} / MONTAGE 换行 {...}
+    if (MONTAGE_KW_RE.test(trimmed)) {
+      const braceIdx = findBraceStart(lines, i);
+      if (braceIdx !== -1) {
+        flush();
+        const { innerLines, endIdx, ok } = consumeBraced(lines, braceIdx);
+        if (!ok) errors.push({ line: lineNo, message: 'MONTAGE 块缺少结束标记 }' });
+        blocks.push(buildMontage(innerLines));
+        i = endIdx - 1;
+        continue;
+      }
+    }
+
+    // 带标识的段落：AP / SP / SE / CE（大括号同行或换行）
+    const tagSame = trimmed.match(PARA_TAG_OPEN_RE);
+    const tagOnly = trimmed.match(PARA_TAG_RE);
+    if (tagSame || tagOnly) {
+      const tag = (tagSame || tagOnly)[1].toUpperCase();
+      const braceIdx = findBraceStart(lines, i);
+      if (braceIdx !== -1) {
+        flush();
+        const { innerLines, endIdx, ok } = consumeBraced(lines, braceIdx);
+        if (!ok) errors.push({ line: lineNo, message: `${tag} 段落缺少结束标记 }` });
+        const node = { type: PARA_TYPE[tag], text: joinParagraph(innerLines) };
+        blocks.push(node);
+        current = node;
+        i = endIdx - 1;
+        continue;
+      }
+      if (tagOnly) {
+        errors.push({ line: lineNo, message: `${tag} 段落应在紧跟的下一行以 { 开始` });
+      }
     }
 
     // 场景标题：# 开头 或 自动识别 INT/EXT
@@ -344,17 +401,22 @@ function parseBodyLines(lines) {
       continue;
     }
 
-    // 括号：整行被括号包裹
+    // 括号：整行被括号包裹。若夹在对话里（@角色 之后或两句台词之间），
+    // 则作为该段对话的表演提示保留在对话块内，不顺带切断台词。
     if (PAREN_RE.test(trimmed)) {
+      if (current && current.type === 'dialogue') {
+        current.lines.push({ paren: trimmed });
+        continue;
+      }
       flush();
       blocks.push({ type: 'paren', text: trimmed });
       continue;
     }
 
-    // 普通文本：追加到对话块，或开启/延续动作段落
+    // 普通文本：追加到对话块，或延续/开启段落（动作 / 场面 / 特效 / 摄影机）
     if (current && current.type === 'dialogue') {
       current.lines.push(trimmed);
-    } else if (current && current.type === 'action') {
+    } else if (current && PARA_TYPES.has(current.type)) {
       current.text = joinLines(current.text, trimmed);
     } else {
       current = { type: 'action', text: trimmed };
